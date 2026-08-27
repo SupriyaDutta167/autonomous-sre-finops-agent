@@ -43,15 +43,18 @@ class SimulationControllerTest {
         SreAction action = new SreAction(ActionType.SCALE_UP, "dev-web-01", "High CPU", "Spike", 0.95, Severity.MEDIUM, 0.0, false);
         PolicyDecision decision = new PolicyDecision(DecisionStatus.APPROVED, ActionType.SCALE_UP, "Approved by policy");
         ExecutionResult execResult = new ExecutionResult(true, ActionType.SCALE_UP, "dev-web-01", "Success", Instant.now(), "RUNNING");
-        OrchestrationResult result = new OrchestrationResult(alert, action, decision, IncidentStatus.APPROVED, execResult);
+        com.sreagent.finops.service.VerificationResult verResult = new com.sreagent.finops.service.VerificationResult(true, ActionType.SCALE_UP, "dev-web-01", "OK", Instant.now());
+        com.sreagent.finops.service.FinOpsResult finOpsResult = new com.sreagent.finops.service.FinOpsResult(0.0, "USD", "OK");
+        OrchestrationResult result = new OrchestrationResult(alert, action, decision, IncidentStatus.RESOLVED, execResult, verResult, finOpsResult);
 
         when(telemetrySimulator.generateTelemetry(IncidentScenario.CPU_SPIKE)).thenReturn(alert);
         when(incidentOrchestrator.processAlert(alert)).thenReturn(result);
 
         mockMvc.perform(post("/api/simulate/cpu-spike"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.finalStatus").value("APPROVED"))
-                .andExpect(jsonPath("$.executionResult.success").value(true));
+                .andExpect(jsonPath("$.finalStatus").value("RESOLVED"))
+                .andExpect(jsonPath("$.executionResult.success").value(true))
+                .andExpect(jsonPath("$.verificationResult.successful").value(true));
     }
 
     @Test
@@ -60,14 +63,17 @@ class SimulationControllerTest {
         SreAction action = new SreAction(ActionType.STOP_VM, "dev-batch-01", "Idle", "Idle", 0.95, Severity.LOW, 50.0, false);
         PolicyDecision decision = new PolicyDecision(DecisionStatus.APPROVED, ActionType.STOP_VM, "Approved");
         ExecutionResult execResult = new ExecutionResult(true, ActionType.STOP_VM, "dev-batch-01", "Stopped", Instant.now(), "STOPPED");
-        OrchestrationResult result = new OrchestrationResult(alert, action, decision, IncidentStatus.APPROVED, execResult);
+        com.sreagent.finops.service.VerificationResult verResult = new com.sreagent.finops.service.VerificationResult(true, ActionType.STOP_VM, "dev-batch-01", "OK", Instant.now());
+        com.sreagent.finops.service.FinOpsResult finOpsResult = new com.sreagent.finops.service.FinOpsResult(150.0, "USD", "Savings");
+        OrchestrationResult result = new OrchestrationResult(alert, action, decision, IncidentStatus.RESOLVED, execResult, verResult, finOpsResult);
 
         when(telemetrySimulator.generateTelemetry(IncidentScenario.IDLE_VM)).thenReturn(alert);
         when(incidentOrchestrator.processAlert(alert)).thenReturn(result);
 
         mockMvc.perform(post("/api/simulate/idle-vm"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.finalStatus").value("APPROVED"));
+                .andExpect(jsonPath("$.finalStatus").value("RESOLVED"))
+                .andExpect(jsonPath("$.finOpsResult.estimatedMonthlySavings").value(150.0));
     }
 
     @Test
@@ -75,7 +81,7 @@ class SimulationControllerTest {
         SystemAlert alert = new SystemAlert("prod-db-01", 5.0, 10.0, 0.0, Instant.now(), "prod", "RUNNING");
         SreAction action = new SreAction(ActionType.STOP_VM, "prod-db-01", "Idle", "Idle", 0.95, Severity.LOW, 50.0, false);
         PolicyDecision decision = new PolicyDecision(DecisionStatus.BLOCKED, ActionType.STOP_VM, "Protected DB");
-        OrchestrationResult result = new OrchestrationResult(alert, action, decision, IncidentStatus.BLOCKED, null);
+        OrchestrationResult result = new OrchestrationResult(alert, action, decision, IncidentStatus.BLOCKED, null, null, null);
 
         when(telemetrySimulator.generateTelemetry(IncidentScenario.UNSAFE_ACTION)).thenReturn(alert);
         when(incidentOrchestrator.processAlert(alert)).thenReturn(result);
@@ -83,6 +89,8 @@ class SimulationControllerTest {
         mockMvc.perform(post("/api/simulate/unsafe-action"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.finalStatus").value("BLOCKED"))
-                .andExpect(jsonPath("$.executionResult").isEmpty()); // it should be missing or null
+                .andExpect(jsonPath("$.executionResult").isEmpty()) // it should be missing or null
+                .andExpect(jsonPath("$.verificationResult").isEmpty())
+                .andExpect(jsonPath("$.finOpsResult").isEmpty());
     }
 }

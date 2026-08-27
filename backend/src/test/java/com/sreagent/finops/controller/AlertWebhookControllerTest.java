@@ -40,7 +40,7 @@ class AlertWebhookControllerTest {
     @Test
     void testValidAlertReturnsOk() throws Exception {
         SystemAlert alert = new SystemAlert("dev-web-01", 95.0, 50.0, 1000.0, Instant.now(), "prod", "RUNNING");
-        OrchestrationResult result = new OrchestrationResult(alert, null, null, IncidentStatus.FAILED, null);
+        OrchestrationResult result = new OrchestrationResult(alert, null, null, IncidentStatus.FAILED, null, null, null);
 
         when(incidentOrchestrator.processAlert(any())).thenReturn(result);
 

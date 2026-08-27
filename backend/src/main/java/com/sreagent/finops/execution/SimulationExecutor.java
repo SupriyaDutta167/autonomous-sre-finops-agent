@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-public class SimulationExecutor implements InfrastructureExecutor {
+public class SimulationExecutor implements InfrastructureExecutor, InfrastructureStateProvider {
 
     private final Map<String, SimulatedVm> vms = new ConcurrentHashMap<>();
 
@@ -30,6 +30,15 @@ public class SimulationExecutor implements InfrastructureExecutor {
 
     public SimulatedVm getVm(String instanceName) {
         return vms.getOrDefault(instanceName, new SimulatedVm(instanceName, "UNKNOWN", 0, 0, 0, 1));
+    }
+
+    @Override
+    public VmState getVmState(String target) {
+        if (!vms.containsKey(target)) {
+            return new VmState(target, "UNKNOWN", 1);
+        }
+        SimulatedVm vm = vms.get(target);
+        return new VmState(vm.getInstanceName(), vm.getState(), vm.getCapacity());
     }
 
     @Override

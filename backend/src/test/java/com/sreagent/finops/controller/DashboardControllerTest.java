@@ -20,10 +20,20 @@ class DashboardControllerTest {
     @MockBean
     private SimulationExecutor simulationExecutor;
 
+    @MockBean
+    private com.sreagent.finops.service.AuditLogService auditLogService;
+
     @Test
     void testHealthReturnsHealthy() throws Exception {
         mockMvc.perform(get("/api/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("healthy"));
+    }
+
+    @Test
+    void testGetIncidentsReturnsAuditHistory() throws Exception {
+        mockMvc.perform(get("/api/incidents"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 }

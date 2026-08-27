@@ -6,11 +6,15 @@ import com.sreagent.finops.model.PolicyDecision;
 import com.sreagent.finops.model.IncidentStatus;
 
 import com.sreagent.finops.execution.ExecutionResult;
+import com.sreagent.finops.service.FinOpsResult;
+import com.sreagent.finops.service.VerificationResult;
 
 public record OrchestrationResult(
     SystemAlert alert,
     SreAction action,
     PolicyDecision decision,
     IncidentStatus finalStatus,
-    ExecutionResult executionResult
+    ExecutionResult executionResult,
+    VerificationResult verificationResult,
+    FinOpsResult finOpsResult
 ) {}

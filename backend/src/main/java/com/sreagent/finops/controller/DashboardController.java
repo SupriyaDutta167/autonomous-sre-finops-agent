@@ -15,9 +15,11 @@ import java.util.Map;
 public class DashboardController {
 
     private final SimulationExecutor simulationExecutor;
+    private final com.sreagent.finops.service.AuditLogService auditLogService;
 
-    public DashboardController(SimulationExecutor simulationExecutor) {
+    public DashboardController(SimulationExecutor simulationExecutor, com.sreagent.finops.service.AuditLogService auditLogService) {
         this.simulationExecutor = simulationExecutor;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping("/health")
@@ -28,5 +30,10 @@ public class DashboardController {
     @GetMapping("/simulation/vms")
     public ResponseEntity<Collection<SimulatedVm>> getSimulatedVms() {
         return ResponseEntity.ok(simulationExecutor.getAllVms());
+    }
+
+    @GetMapping("/incidents")
+    public ResponseEntity<Collection<com.sreagent.finops.model.IncidentAuditLog>> getIncidents() {
+        return ResponseEntity.ok(auditLogService.getAllIncidents());
     }
 }

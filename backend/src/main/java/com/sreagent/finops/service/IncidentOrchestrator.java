@@ -9,6 +9,9 @@ import com.sreagent.finops.safety.ActionValidator;
 import com.sreagent.finops.safety.PolicyEngine;
 import com.sreagent.finops.execution.ExecutionResult;
 import com.sreagent.finops.execution.InfrastructureExecutor;
+import com.sreagent.finops.execution.InfrastructureStateProvider;
+import com.sreagent.finops.execution.VmState;
+import com.sreagent.finops.model.IncidentAuditLog;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,24 +21,40 @@ public class IncidentOrchestrator {
     private final ActionValidator actionValidator;
     private final PolicyEngine policyEngine;
     private final InfrastructureExecutor infrastructureExecutor;
+    private final VerificationService verificationService;
+    private final FinOpsService finOpsService;
+    private final AuditLogService auditLogService;
+    private final InfrastructureStateProvider stateProvider;
 
-    public IncidentOrchestrator(SreReasoningEngine sreReasoningEngine, ActionValidator actionValidator, PolicyEngine policyEngine, InfrastructureExecutor infrastructureExecutor) {
+    public IncidentOrchestrator(SreReasoningEngine sreReasoningEngine, ActionValidator actionValidator, 
+                                PolicyEngine policyEngine, InfrastructureExecutor infrastructureExecutor,
+                                VerificationService verificationService, FinOpsService finOpsService, 
+                                AuditLogService auditLogService, InfrastructureStateProvider stateProvider) {
         this.sreReasoningEngine = sreReasoningEngine;
         this.actionValidator = actionValidator;
         this.policyEngine = policyEngine;
         this.infrastructureExecutor = infrastructureExecutor;
+        this.verificationService = verificationService;
+        this.finOpsService = finOpsService;
+        this.auditLogService = auditLogService;
+        this.stateProvider = stateProvider;
     }
 
     public OrchestrationResult processAlert(SystemAlert alert) {
         IncidentStatus status = IncidentStatus.DETECTED;
         SreAction action = null;
+        ExecutionResult executionResult = null;
+        VerificationResult verificationResult = null;
+        FinOpsResult finOpsResult = null;
+        PolicyDecision decision = null;
 
         try {
             status = IncidentStatus.ANALYZING;
             action = sreReasoningEngine.analyzeAlert(alert);
             status = IncidentStatus.ACTION_PROPOSED;
         } catch (Exception e) {
-            return new OrchestrationResult(alert, null, null, IncidentStatus.FAILED, null);
+            status = IncidentStatus.FAILED;
+            return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
         }
 
         status = IncidentStatus.POLICY_CHECK;
@@ -43,23 +62,85 @@ public class IncidentOrchestrator {
         try {
             actionValidator.validate(action);
         } catch (Exception e) {
-            return new OrchestrationResult(alert, action, new PolicyDecision(DecisionStatus.BLOCKED, action.action(), "Validation failed: " + e.getMessage()), IncidentStatus.BLOCKED, null);
+            decision = new PolicyDecision(DecisionStatus.BLOCKED, action.action(), "Validation failed: " + e.getMessage());
+            status = IncidentStatus.BLOCKED;
+            return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
         }
 
-        PolicyDecision decision = policyEngine.evaluate(action);
+        decision = policyEngine.evaluate(action);
         
         switch (decision.status()) {
             case APPROVED -> status = IncidentStatus.APPROVED;
-            case REQUIRES_APPROVAL -> status = IncidentStatus.APPROVAL_REQUIRED;
-            case BLOCKED -> status = IncidentStatus.BLOCKED;
-            default -> status = IncidentStatus.BLOCKED;
+            case REQUIRES_APPROVAL -> {
+                status = IncidentStatus.APPROVAL_REQUIRED;
+                return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
+            }
+            case BLOCKED -> {
+                status = IncidentStatus.BLOCKED;
+                return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
+            }
+            default -> {
+                status = IncidentStatus.BLOCKED;
+                return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
+            }
         }
         
-        ExecutionResult executionResult = null;
-        if (status == IncidentStatus.APPROVED) {
+        try {
+            // Fetch previous state for verification
+            VmState previousState = null;
+            if (action.target() != null) {
+                VmState current = stateProvider.getVmState(action.target());
+                if (!current.state().equals("UNKNOWN")) {
+                    previousState = new VmState(current.instanceName(), current.state(), current.capacity());
+                }
+            }
+
+            status = IncidentStatus.EXECUTING;
             executionResult = infrastructureExecutor.execute(action);
+            
+            if (!executionResult.success()) {
+                status = IncidentStatus.FAILED;
+                return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
+            }
+
+            status = IncidentStatus.VERIFYING;
+            verificationResult = verificationService.verify(action, executionResult, previousState);
+            
+            if (!verificationResult.successful()) {
+                status = IncidentStatus.FAILED;
+                return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
+            }
+
+            finOpsResult = finOpsService.calculateEstimatedImpact(action);
+            status = IncidentStatus.RESOLVED;
+
+        } catch (Exception e) {
+            status = IncidentStatus.FAILED;
         }
 
-        return new OrchestrationResult(alert, action, decision, status, executionResult);
+        return recordAndReturn(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
+    }
+
+    private OrchestrationResult recordAndReturn(SystemAlert alert, SreAction action, PolicyDecision decision, 
+                                                IncidentStatus status, ExecutionResult executionResult, 
+                                                VerificationResult verificationResult, FinOpsResult finOpsResult) {
+        
+        double estimatedSavings = (finOpsResult != null) ? finOpsResult.estimatedMonthlySavings() : 0.0;
+
+
+        IncidentAuditLog log = new IncidentAuditLog(
+                java.util.UUID.randomUUID().toString(),
+                action != null ? action.target() : (alert != null ? alert.instanceName() : "UNKNOWN"),
+                alert, action, decision, status,
+                decision != null ? decision.reason() : status.name(),
+                java.time.Instant.now(),
+                estimatedSavings,
+                executionResult,
+                verificationResult
+        );
+        
+        auditLogService.recordIncident(log);
+
+        return new OrchestrationResult(alert, action, decision, status, executionResult, verificationResult, finOpsResult);
     }
 }
