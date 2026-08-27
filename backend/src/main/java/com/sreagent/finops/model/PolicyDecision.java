@@ -1,7 +1,7 @@
 package com.sreagent.finops.model;
 
 public record PolicyDecision(
-    boolean allowed,
+    DecisionStatus status,
     ActionType action,
     String reason
 ) {}

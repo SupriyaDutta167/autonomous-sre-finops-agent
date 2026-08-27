@@ -4,8 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
-    "spring.ai.vertex.ai.gemini.project-id=test-project",
-    "spring.ai.vertex.ai.gemini.location=us-central1"
+    "spring.ai.google.genai.api-key=test-api-key"
 })
 class FinopsApplicationTests {
 

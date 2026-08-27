@@ -15,17 +15,17 @@ import static org.mockito.Mockito.*;
 
 class IncidentOrchestratorTest {
 
-    private GeminiSreService geminiSreService;
+    private SreReasoningEngine sreReasoningEngine;
     private IncidentOrchestrator orchestrator;
 
     @BeforeEach
     void setUp() {
-        geminiSreService = mock(GeminiSreService.class);
+        sreReasoningEngine = mock(SreReasoningEngine.class);
         ActionValidator actionValidator = new ActionValidator();
         SafetyPolicy safetyPolicy = new SafetyPolicy();
         PolicyEngine policyEngine = new PolicyEngine(actionValidator, safetyPolicy);
         
-        orchestrator = new IncidentOrchestrator(geminiSreService, actionValidator, policyEngine);
+        orchestrator = new IncidentOrchestrator(sreReasoningEngine, actionValidator, policyEngine);
     }
 
     private SystemAlert createAlert(String target) {
@@ -37,19 +37,19 @@ class IncidentOrchestratorTest {
         SystemAlert alert = createAlert("dev-web-01");
         SreAction action = new SreAction(ActionType.RESTART_VM, "dev-web-01", "High CPU", "Spike", 0.95, Severity.MEDIUM, 0.0, false);
         
-        when(geminiSreService.analyzeAlert(any())).thenReturn(action);
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
         
         OrchestrationResult result = orchestrator.processAlert(alert);
         
         assertEquals(IncidentStatus.APPROVED, result.finalStatus());
-        assertTrue(result.decision().allowed());
+        assertEquals(DecisionStatus.APPROVED, result.decision().status());
         assertEquals(ActionType.RESTART_VM, result.action().action());
     }
 
     @Test
     void testGeminiFailure() {
         SystemAlert alert = createAlert("dev-web-01");
-        when(geminiSreService.analyzeAlert(any())).thenThrow(new RuntimeException("Gemini failed"));
+        when(sreReasoningEngine.analyzeAlert(any())).thenThrow(new RuntimeException("Gemini failed"));
         
         OrchestrationResult result = orchestrator.processAlert(alert);
         
@@ -63,13 +63,26 @@ class IncidentOrchestratorTest {
         SystemAlert alert = createAlert("prod-db-01");
         SreAction action = new SreAction(ActionType.STOP_VM, "prod-db-01", "Cost savings", "Idle", 0.95, Severity.LOW, 50.0, false);
         
-        when(geminiSreService.analyzeAlert(any())).thenReturn(action);
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
         
         OrchestrationResult result = orchestrator.processAlert(alert);
         
         assertEquals(IncidentStatus.BLOCKED, result.finalStatus());
-        assertFalse(result.decision().allowed());
+        assertEquals(DecisionStatus.BLOCKED, result.decision().status());
         assertEquals("Production database resources are protected from autonomous shutdown.", result.decision().reason());
+    }
+
+    @Test
+    void testRequiresApprovalActionReturnsApprovalRequired() {
+        SystemAlert alert = createAlert("prod-web-01");
+        SreAction action = new SreAction(ActionType.SCALE_UP, "prod-web-01", "High traffic", "Spike", 0.95, Severity.MEDIUM, 0.0, true);
+        
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
+        
+        OrchestrationResult result = orchestrator.processAlert(alert);
+        
+        assertEquals(IncidentStatus.APPROVAL_REQUIRED, result.finalStatus());
+        assertEquals(DecisionStatus.REQUIRES_APPROVAL, result.decision().status());
     }
 
     @Test
@@ -77,12 +90,12 @@ class IncidentOrchestratorTest {
         SystemAlert alert = createAlert("prod-web-01");
         SreAction action = new SreAction(ActionType.NO_ACTION, "prod-web-01", "Normal", "None", 0.95, Severity.LOW, 0.0, false);
         
-        when(geminiSreService.analyzeAlert(any())).thenReturn(action);
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
         
         OrchestrationResult result = orchestrator.processAlert(alert);
         
         assertEquals(IncidentStatus.APPROVED, result.finalStatus());
-        assertTrue(result.decision().allowed());
+        assertEquals(DecisionStatus.APPROVED, result.decision().status());
     }
 
     @Test
@@ -90,12 +103,29 @@ class IncidentOrchestratorTest {
         SystemAlert alert = createAlert("dev-web-01");
         SreAction action = new SreAction(ActionType.RESTART_VM, "", "Missing target", "Unknown", 0.95, Severity.LOW, 0.0, false);
         
-        when(geminiSreService.analyzeAlert(any())).thenReturn(action);
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
         
         OrchestrationResult result = orchestrator.processAlert(alert);
         
         assertEquals(IncidentStatus.BLOCKED, result.finalStatus());
-        assertFalse(result.decision().allowed());
+        assertEquals(DecisionStatus.BLOCKED, result.decision().status());
         assertTrue(result.decision().reason().contains("Validation failed"));
+    }
+
+    @Test
+    void testIncidentOrchestratorWithMockSreReasoningService() {
+        MockSreReasoningService mockEngine = new MockSreReasoningService();
+        ActionValidator actionValidator = new ActionValidator();
+        SafetyPolicy safetyPolicy = new SafetyPolicy();
+        PolicyEngine policyEngine = new PolicyEngine(actionValidator, safetyPolicy);
+        
+        IncidentOrchestrator testOrchestrator = new IncidentOrchestrator(mockEngine, actionValidator, policyEngine);
+        
+        SystemAlert alert = createAlert("prod-db-01"); // This will trigger STOP_VM from mock
+        OrchestrationResult result = testOrchestrator.processAlert(alert);
+        
+        assertEquals(IncidentStatus.BLOCKED, result.finalStatus());
+        assertEquals(DecisionStatus.BLOCKED, result.decision().status());
+        assertEquals(ActionType.STOP_VM, result.action().action());
     }
 }

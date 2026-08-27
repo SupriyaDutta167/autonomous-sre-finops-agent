@@ -7,6 +7,7 @@ public enum IncidentStatus {
     POLICY_CHECK,
     APPROVED,
     BLOCKED,
+    APPROVAL_REQUIRED,
     EXECUTING,
     VERIFYING,
     RESOLVED,

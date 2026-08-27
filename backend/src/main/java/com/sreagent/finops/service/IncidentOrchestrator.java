@@ -3,6 +3,7 @@ package com.sreagent.finops.service;
 import com.sreagent.finops.model.SystemAlert;
 import com.sreagent.finops.model.SreAction;
 import com.sreagent.finops.model.PolicyDecision;
+import com.sreagent.finops.model.DecisionStatus;
 import com.sreagent.finops.model.IncidentStatus;
 import com.sreagent.finops.safety.ActionValidator;
 import com.sreagent.finops.safety.PolicyEngine;
@@ -11,12 +12,12 @@ import org.springframework.stereotype.Service;
 @Service
 public class IncidentOrchestrator {
 
-    private final GeminiSreService geminiSreService;
+    private final SreReasoningEngine sreReasoningEngine;
     private final ActionValidator actionValidator;
     private final PolicyEngine policyEngine;
 
-    public IncidentOrchestrator(GeminiSreService geminiSreService, ActionValidator actionValidator, PolicyEngine policyEngine) {
-        this.geminiSreService = geminiSreService;
+    public IncidentOrchestrator(SreReasoningEngine sreReasoningEngine, ActionValidator actionValidator, PolicyEngine policyEngine) {
+        this.sreReasoningEngine = sreReasoningEngine;
         this.actionValidator = actionValidator;
         this.policyEngine = policyEngine;
     }
@@ -27,7 +28,7 @@ public class IncidentOrchestrator {
 
         try {
             status = IncidentStatus.ANALYZING;
-            action = geminiSreService.analyzeAlert(alert);
+            action = sreReasoningEngine.analyzeAlert(alert);
             status = IncidentStatus.ACTION_PROPOSED;
         } catch (Exception e) {
             return new OrchestrationResult(alert, null, null, IncidentStatus.FAILED);
@@ -38,15 +39,16 @@ public class IncidentOrchestrator {
         try {
             actionValidator.validate(action);
         } catch (Exception e) {
-            return new OrchestrationResult(alert, action, new PolicyDecision(false, action.action(), "Validation failed: " + e.getMessage()), IncidentStatus.BLOCKED);
+            return new OrchestrationResult(alert, action, new PolicyDecision(DecisionStatus.BLOCKED, action.action(), "Validation failed: " + e.getMessage()), IncidentStatus.BLOCKED);
         }
 
         PolicyDecision decision = policyEngine.evaluate(action);
         
-        if (decision.allowed()) {
-            status = IncidentStatus.APPROVED;
-        } else {
-            status = IncidentStatus.BLOCKED;
+        switch (decision.status()) {
+            case APPROVED -> status = IncidentStatus.APPROVED;
+            case REQUIRES_APPROVAL -> status = IncidentStatus.APPROVAL_REQUIRED;
+            case BLOCKED -> status = IncidentStatus.BLOCKED;
+            default -> status = IncidentStatus.BLOCKED;
         }
 
         return new OrchestrationResult(alert, action, decision, status);
