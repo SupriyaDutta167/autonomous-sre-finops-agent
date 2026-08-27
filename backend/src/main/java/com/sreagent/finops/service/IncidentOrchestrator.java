@@ -7,6 +7,8 @@ import com.sreagent.finops.model.DecisionStatus;
 import com.sreagent.finops.model.IncidentStatus;
 import com.sreagent.finops.safety.ActionValidator;
 import com.sreagent.finops.safety.PolicyEngine;
+import com.sreagent.finops.execution.ExecutionResult;
+import com.sreagent.finops.execution.InfrastructureExecutor;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -15,11 +17,13 @@ public class IncidentOrchestrator {
     private final SreReasoningEngine sreReasoningEngine;
     private final ActionValidator actionValidator;
     private final PolicyEngine policyEngine;
+    private final InfrastructureExecutor infrastructureExecutor;
 
-    public IncidentOrchestrator(SreReasoningEngine sreReasoningEngine, ActionValidator actionValidator, PolicyEngine policyEngine) {
+    public IncidentOrchestrator(SreReasoningEngine sreReasoningEngine, ActionValidator actionValidator, PolicyEngine policyEngine, InfrastructureExecutor infrastructureExecutor) {
         this.sreReasoningEngine = sreReasoningEngine;
         this.actionValidator = actionValidator;
         this.policyEngine = policyEngine;
+        this.infrastructureExecutor = infrastructureExecutor;
     }
 
     public OrchestrationResult processAlert(SystemAlert alert) {
@@ -31,7 +35,7 @@ public class IncidentOrchestrator {
             action = sreReasoningEngine.analyzeAlert(alert);
             status = IncidentStatus.ACTION_PROPOSED;
         } catch (Exception e) {
-            return new OrchestrationResult(alert, null, null, IncidentStatus.FAILED);
+            return new OrchestrationResult(alert, null, null, IncidentStatus.FAILED, null);
         }
 
         status = IncidentStatus.POLICY_CHECK;
@@ -39,7 +43,7 @@ public class IncidentOrchestrator {
         try {
             actionValidator.validate(action);
         } catch (Exception e) {
-            return new OrchestrationResult(alert, action, new PolicyDecision(DecisionStatus.BLOCKED, action.action(), "Validation failed: " + e.getMessage()), IncidentStatus.BLOCKED);
+            return new OrchestrationResult(alert, action, new PolicyDecision(DecisionStatus.BLOCKED, action.action(), "Validation failed: " + e.getMessage()), IncidentStatus.BLOCKED, null);
         }
 
         PolicyDecision decision = policyEngine.evaluate(action);
@@ -50,7 +54,12 @@ public class IncidentOrchestrator {
             case BLOCKED -> status = IncidentStatus.BLOCKED;
             default -> status = IncidentStatus.BLOCKED;
         }
+        
+        ExecutionResult executionResult = null;
+        if (status == IncidentStatus.APPROVED) {
+            executionResult = infrastructureExecutor.execute(action);
+        }
 
-        return new OrchestrationResult(alert, action, decision, status);
+        return new OrchestrationResult(alert, action, decision, status, executionResult);
     }
 }

@@ -43,4 +43,15 @@ class MockSreReasoningServiceTest {
         
         assertEquals(ActionType.STOP_VM, action.action());
     }
+
+    @Test
+    void testReturnsStopVmForIdleVm() {
+        SystemAlert alert = new SystemAlert("dev-batch-01", 5.0, 10.0, 0.0, Instant.now(), "dev", "RUNNING");
+        SreAction action = mockEngine.analyzeAlert(alert);
+        
+        assertEquals(ActionType.STOP_VM, action.action());
+        assertEquals(0.95, action.confidence());
+        assertEquals(false, action.requiresApproval());
+        assertEquals(150.0, action.estimatedSavings());
+    }
 }

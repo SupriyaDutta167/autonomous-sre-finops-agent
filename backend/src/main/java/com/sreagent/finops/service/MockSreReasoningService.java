@@ -13,6 +13,20 @@ public class MockSreReasoningService implements SreReasoningEngine {
 
     @Override
     public SreAction analyzeAlert(SystemAlert alert) {
+        // Traffic Surge
+        if (alert.requestRate() > 2000.0) {
+            return new SreAction(
+                    ActionType.SCALE_UP,
+                    alert.instanceName(),
+                    "Traffic surge detected",
+                    "Traffic surge",
+                    0.95,
+                    Severity.CRITICAL,
+                    0.0,
+                    false
+            );
+        }
+
         // High CPU / high request rate
         if (alert.cpuUtilization() > 90.0 && alert.requestRate() > 1000.0) {
             return new SreAction(
@@ -23,20 +37,34 @@ public class MockSreReasoningService implements SreReasoningEngine {
                     0.95,
                     Severity.HIGH,
                     0.0,
-                    true // or false, depending on tests, let's keep false unless tests expect true, actually mock shouldn't care much, but wait, the prompt says "confidence = 0.95, severity = HIGH or CRITICAL"
+                    false
             );
         }
 
-        // Low utilization
-        if (alert.cpuUtilization() < 10.0 && alert.memoryUtilization() < 10.0) {
+        // Memory Leak
+        if (alert.memoryUtilization() > 90.0) {
+            return new SreAction(
+                    ActionType.RESTART_VM,
+                    alert.instanceName(),
+                    "High memory utilization detected",
+                    "Memory leak",
+                    0.95,
+                    Severity.HIGH,
+                    0.0,
+                    false
+            );
+        }
+
+        // Low utilization (Idle VM)
+        if (alert.cpuUtilization() < 10.0 && alert.memoryUtilization() <= 15.0 && alert.requestRate() < 10.0) {
             return new SreAction(
                     ActionType.STOP_VM,
                     alert.instanceName(),
-                    "Low utilization detected",
+                    "Low utilization detected. Simulated hackathon FinOps estimate: $150.0/mo savings.",
                     "Idle resource",
                     0.95,
                     Severity.LOW,
-                    100.0,
+                    150.0,
                     false
             );
         }

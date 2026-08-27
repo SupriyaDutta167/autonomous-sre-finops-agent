@@ -5,9 +5,12 @@ import com.sreagent.finops.model.SreAction;
 import com.sreagent.finops.model.PolicyDecision;
 import com.sreagent.finops.model.IncidentStatus;
 
+import com.sreagent.finops.execution.ExecutionResult;
+
 public record OrchestrationResult(
     SystemAlert alert,
     SreAction action,
     PolicyDecision decision,
-    IncidentStatus finalStatus
+    IncidentStatus finalStatus,
+    ExecutionResult executionResult
 ) {}

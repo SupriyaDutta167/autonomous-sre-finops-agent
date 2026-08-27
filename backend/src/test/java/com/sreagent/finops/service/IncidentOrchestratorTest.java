@@ -1,6 +1,7 @@
 package com.sreagent.finops.service;
 
 import com.sreagent.finops.model.*;
+import com.sreagent.finops.execution.*;
 import com.sreagent.finops.safety.ActionValidator;
 import com.sreagent.finops.safety.PolicyEngine;
 import com.sreagent.finops.safety.SafetyPolicy;
@@ -16,16 +17,18 @@ import static org.mockito.Mockito.*;
 class IncidentOrchestratorTest {
 
     private SreReasoningEngine sreReasoningEngine;
+    private InfrastructureExecutor infrastructureExecutor;
     private IncidentOrchestrator orchestrator;
 
     @BeforeEach
     void setUp() {
         sreReasoningEngine = mock(SreReasoningEngine.class);
+        infrastructureExecutor = mock(InfrastructureExecutor.class);
         ActionValidator actionValidator = new ActionValidator();
         SafetyPolicy safetyPolicy = new SafetyPolicy();
         PolicyEngine policyEngine = new PolicyEngine(actionValidator, safetyPolicy);
         
-        orchestrator = new IncidentOrchestrator(sreReasoningEngine, actionValidator, policyEngine);
+        orchestrator = new IncidentOrchestrator(sreReasoningEngine, actionValidator, policyEngine, infrastructureExecutor);
     }
 
     private SystemAlert createAlert(String target) {
@@ -118,8 +121,9 @@ class IncidentOrchestratorTest {
         ActionValidator actionValidator = new ActionValidator();
         SafetyPolicy safetyPolicy = new SafetyPolicy();
         PolicyEngine policyEngine = new PolicyEngine(actionValidator, safetyPolicy);
+        InfrastructureExecutor mockExecutor = mock(InfrastructureExecutor.class);
         
-        IncidentOrchestrator testOrchestrator = new IncidentOrchestrator(mockEngine, actionValidator, policyEngine);
+        IncidentOrchestrator testOrchestrator = new IncidentOrchestrator(mockEngine, actionValidator, policyEngine, mockExecutor);
         
         SystemAlert alert = createAlert("prod-db-01"); // This will trigger STOP_VM from mock
         OrchestrationResult result = testOrchestrator.processAlert(alert);
@@ -127,5 +131,45 @@ class IncidentOrchestratorTest {
         assertEquals(IncidentStatus.BLOCKED, result.finalStatus());
         assertEquals(DecisionStatus.BLOCKED, result.decision().status());
         assertEquals(ActionType.STOP_VM, result.action().action());
+    }
+
+    @Test
+    void testApprovedActionReachesExecutor() {
+        SystemAlert alert = createAlert("dev-web-01");
+        SreAction action = new SreAction(ActionType.RESTART_VM, "dev-web-01", "High CPU", "Spike", 0.95, Severity.MEDIUM, 0.0, false);
+        
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
+        when(infrastructureExecutor.execute(any())).thenReturn(new ExecutionResult(true, ActionType.RESTART_VM, "dev-web-01", "Success", Instant.now(), "RUNNING"));
+        
+        OrchestrationResult result = orchestrator.processAlert(alert);
+        
+        assertEquals(IncidentStatus.APPROVED, result.finalStatus());
+        verify(infrastructureExecutor, times(1)).execute(any());
+    }
+
+    @Test
+    void testBlockedActionNeverReachesExecutor() {
+        SystemAlert alert = createAlert("prod-db-01");
+        SreAction action = new SreAction(ActionType.STOP_VM, "prod-db-01", "Cost savings", "Idle", 0.95, Severity.LOW, 50.0, false);
+        
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
+        
+        OrchestrationResult result = orchestrator.processAlert(alert);
+        
+        assertEquals(IncidentStatus.BLOCKED, result.finalStatus());
+        verify(infrastructureExecutor, never()).execute(any());
+    }
+
+    @Test
+    void testRequiresApprovalActionNeverReachesExecutor() {
+        SystemAlert alert = createAlert("prod-web-01");
+        SreAction action = new SreAction(ActionType.SCALE_UP, "prod-web-01", "High traffic", "Spike", 0.95, Severity.MEDIUM, 0.0, true);
+        
+        when(sreReasoningEngine.analyzeAlert(any())).thenReturn(action);
+        
+        OrchestrationResult result = orchestrator.processAlert(alert);
+        
+        assertEquals(IncidentStatus.APPROVAL_REQUIRED, result.finalStatus());
+        verify(infrastructureExecutor, never()).execute(any());
     }
 }
