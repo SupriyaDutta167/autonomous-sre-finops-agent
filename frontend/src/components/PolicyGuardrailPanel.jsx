@@ -42,6 +42,18 @@ const PolicyGuardrailPanel = ({ decisionStatus, decisionReason, actionTarget, ac
                     ✕ EXECUTION PREVENTED
                 </div>
             )}
+            
+            {decisionStatus === 'REQUIRES_APPROVAL' && (
+                <div className="mt-4 text-yellow-500 font-semibold text-sm">
+                    HUMAN APPROVAL REQUIRED
+                </div>
+            )}
+
+            {decisionStatus === 'APPROVED' && (
+                <div className="mt-4 text-green-500 font-semibold text-sm">
+                    ✓ EXECUTION ALLOWED
+                </div>
+            )}
         </div>
     );
 };

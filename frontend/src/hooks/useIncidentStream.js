@@ -6,9 +6,9 @@ export const useIncidentStream = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const fetchIncidents = useCallback(async () => {
+    const fetchIncidents = useCallback(async (isInitial = false) => {
         try {
-            setLoading(true);
+            if (isInitial) setLoading(true);
             const data = await getIncidents();
             // Data is expected to be an array, sort by timestamp descending
             const sortedData = [...data].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -17,16 +17,16 @@ export const useIncidentStream = () => {
         } catch (err) {
             setError(err.message);
         } finally {
-            setLoading(false);
+            if (isInitial) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        fetchIncidents();
+        fetchIncidents(true);
         
         // Lightweight polling (e.g., every 10 seconds)
-        const interval = setInterval(fetchIncidents, 10000);
+        const interval = setInterval(() => fetchIncidents(false), 10000);
         return () => clearInterval(interval);
     }, [fetchIncidents]);
 
