@@ -18,6 +18,7 @@ public class SimulationExecutor implements InfrastructureExecutor, Infrastructur
         vms.put("prod-web-01", new SimulatedVm("prod-web-01", "RUNNING", 50.0, 50.0, 500.0, 4));
         vms.put("prod-db-01", new SimulatedVm("prod-db-01", "RUNNING", 40.0, 60.0, 200.0, 8));
         vms.put("dev-web-01", new SimulatedVm("dev-web-01", "RUNNING", 10.0, 20.0, 50.0, 2));
+        vms.put("prod-web-03", new SimulatedVm("prod-web-03", "RUNNING", 60.0, 50.0, 400.0, 2));
     }
 
     public Collection<SimulatedVm> getAllVms() {

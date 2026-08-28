@@ -80,4 +80,23 @@ class SimulationExecutorTest {
         assertTrue(result.success());
         assertEquals("RUNNING", result.resultingState());
     }
+
+    @Test
+    void testProdWeb03ExistsAndScalesUp() {
+        SimulatedVm vm = executor.getVm("prod-web-03");
+        // 1. prod-web-03 exists when SimulationExecutor initializes
+        // 2. its initial state is valid
+        assertEquals("RUNNING", vm.getState());
+        assertEquals(2, vm.getCapacity());
+
+        int initialCapacity = vm.getCapacity();
+        
+        // 3. TRAFFIC_SURGE / SCALE_UP updates its capacity successfully
+        ExecutionResult result = executor.execute(createAction(ActionType.SCALE_UP, "prod-web-03"));
+        assertTrue(result.success());
+        
+        // 4. resulting state is RUNNING
+        assertEquals("RUNNING", result.resultingState());
+        assertEquals(initialCapacity * 2, executor.getVm("prod-web-03").getCapacity());
+    }
 }
