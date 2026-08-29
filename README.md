@@ -35,9 +35,27 @@ FinOps estimates savings based on successful reliability actions.
 - `BLOCKED`, `REQUIRES_APPROVAL`, and `FAILED` actions always record $0 savings.
 All reported values are **simulated estimated monthly savings**, not actual billing data.
 
-## 6. Simulation Mode
-This project runs entirely in **SIMULATION MODE**. It uses a `SimulationExecutor` and `TelemetrySimulator` to mutate an in-memory infrastructure state. 
-**There is NO real GCP execution and NO real billing data involved.** All states, metrics, and instances are artificially simulated.
+## 6. Simulation and GCP Mode
+By default, the project runs in **SIMULATION MODE**. It uses a `SimulationExecutor` and `TelemetrySimulator` to mutate an in-memory infrastructure state. 
+- No GCP credentials required.
+- No billing required.
+
+### Optional GCP Mode
+The project provides an optional `GcpComputeService` adapter for real Google Cloud Compute Engine integration.
+- To enable, activate the `gcp` Spring profile and configure `finops.gcp.project-id` and `finops.gcp.compute-zone`.
+- Requires appropriate standard Google Cloud authentication (e.g. ADC).
+
+### Mutation Safety
+**Real GCP mutations are disabled by default.**
+To allow actual infrastructure changes, you must explicitly set `finops.gcp.mutations.enabled=true`. If false (the default), the GCP executor will safely refuse mutation commands.
+
+### Architecture
+The execution boundary delegates to either simulation or GCP:
+`InfrastructureExecutor` -> `SimulationExecutor` (default) or `GcpComputeService`
+`InfrastructureStateProvider` -> `SimulationExecutor` (default) or `GcpInfrastructureStateProvider`
+
+### Important Disclaimer
+**Real GCP infrastructure mutations were not performed during development/testing.** The GCP integration demonstrates structural pluggability. Real billing integration is out of scope.
 
 ## 7. Gemini Integration
 The system integrates with Google's Gemini AI via Spring AI to process telemetry and propose remediation actions. The `GeminiSreService` provides the reasoning capability, while a deterministic `MockSreReasoningService` is available for offline or testing purposes. The frontend never communicates directly with Gemini.

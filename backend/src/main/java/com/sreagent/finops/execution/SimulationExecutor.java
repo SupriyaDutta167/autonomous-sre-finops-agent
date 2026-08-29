@@ -1,6 +1,7 @@
 package com.sreagent.finops.execution;
 
 import com.sreagent.finops.model.SreAction;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -9,6 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Profile("!gcp")
 public class SimulationExecutor implements InfrastructureExecutor, InfrastructureStateProvider {
 
     private final Map<String, SimulatedVm> vms = new ConcurrentHashMap<>();

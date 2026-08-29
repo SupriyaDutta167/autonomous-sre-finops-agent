@@ -1,0 +1,17 @@
+# GCP Credentials and Secrets
+*credentials*.json
+*service-account*.json
+*gcp-sa*.json
+*secret*.json
+.env
+.env.local
+.env.*.local
+
+# Keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# General
+.DS_Store
