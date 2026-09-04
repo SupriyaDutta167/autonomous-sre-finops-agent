@@ -1,0 +1,65 @@
+name: Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  beta:
+    name: Deploy to Beta
+    runs-on: ubuntu-latest
+    environment: beta
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          # Put your actual test command here
+
+      - name: Deploy to Beta
+        run: |
+          echo "Deploying to BETA..."
+          # Put your deployment command here
+
+
+  gamma:
+    name: Deploy to Gamma
+    needs: beta
+    runs-on: ubuntu-latest
+    environment: gamma
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Gamma
+        run: |
+          echo "Deploying to GAMMA..."
+
+      - name: Integration Tests
+        run: |
+          echo "Running integration tests..."
+
+      - name: Hydra Tests
+        run: |
+          echo "Running Hydra tests..."
+
+
+  production:
+    name: Deploy to Production
+    needs: gamma
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Production
+        run: |
+          echo "Deploying to PRODUCTION..."
