@@ -752,13 +752,66 @@ This project demonstrates a mature approach to AIOps. Rather than building a fra
 
 ---
 
-## 54. License
+## 54. CI/CD Pipeline
+
+The project utilizes a professional GitHub Actions CI/CD pipeline to validate and progressively promote builds through multiple environments (Beta → Gamma → Production).
+
+### Pipeline Flow
+
+```text
+Push / PR
+  │
+  ▼
+Source Validation
+  │
+  ├─► Backend Build + Tests
+  │
+  └─► Frontend Lint + Build
+         │
+         ▼
+    Quality Gate
+         │
+         ▼
+ Beta Validation
+         │
+         ▼
+ Gamma Validation
+         │
+         ▼
+ Production Release Gate
+```
+
+### Architecture
+- **GitHub Actions**: The pipeline is defined in `.github/workflows/ci-cd.yml`.
+- **Backend Validation**: Uses Java 21 (`actions/setup-java`) and the Maven wrapper to compile, run tests, and package the JAR.
+- **Frontend Validation**: Uses Node.js 22 (`actions/setup-node`) to execute `npm ci`, `npm run lint`, and `npm run build`.
+- **Artifact Promotion**: Successful backend JARs and frontend `dist` folders are uploaded as pipeline artifacts (`backend-build` and `frontend-build`) and subsequently downloaded in later deployment gates. This guarantees that exactly what was built and tested is promoted, rather than rebuilding independently per environment.
+- **Security**: The pipeline requires no secrets, relies strictly on simulation-first execution (no GCP credentials required), and makes zero external AI calls (Gemini API is not invoked during CI).
+- **Deployment**: No real infrastructure deployment occurs in this pipeline. The environments act as logical promotion gates for the verified build artifacts.
+
+### GitHub Environments
+
+The pipeline references three GitHub Environments that represent the release lifecycle:
+- `beta`
+- `gamma`
+- `production`
+
+**Configuration Requirement:**
+To fully utilize the pipeline, a repository administrator should create these environments manually:
+1. Go to **Settings** → **Environments**.
+2. Click **New environment**.
+3. Create `beta`, `gamma`, and `production`.
+4. *(Optional)* Add **Required reviewers** to the `production` environment to enforce a manual human approval step before the final release gate passes.
+
+---
+
+## 55. License
 
 License: not yet specified.
 
 ---
 
-## 55. Author / Project
+## 56. Author / Project
 
 Autonomous SRE + FinOps Agent
 *(Hackathon Submission)*

@@ -1,0 +1,301 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: finops-agent-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  source-validation:
+    name: Source Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Project Structure
+        run: |
+          echo "Validating core files..."
+          missing=0
+          
+          files=(
+            "backend/pom.xml"
+            "backend/mvnw"
+            "frontend/package.json"
+            "frontend/package-lock.json"
+            "frontend/vite.config.js"
+            "README.md"
+          )
+          
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Missing expected file: $file"
+              missing=$((missing + 1))
+            else
+              echo "Found: $file"
+            fi
+          done
+          
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Source validation failed due to missing files."
+            exit 1
+          fi
+          
+          echo "Source validation completed successfully."
+
+  backend:
+    name: Backend Build + Tests
+    needs: source-validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Make Maven Wrapper Executable
+        run: chmod +x backend/mvnw
+
+      - name: Compile Backend
+        run: ./mvnw clean compile
+        working-directory: backend
+
+      - name: Test Backend
+        run: ./mvnw test
+        working-directory: backend
+
+      - name: Package Backend
+        run: ./mvnw package -DskipTests
+        working-directory: backend
+
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build
+          path: backend/target/*.jar
+
+  frontend:
+    name: Frontend Lint + Build
+    needs: source-validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Lint Frontend
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Build Frontend
+        run: npm run build
+        working-directory: frontend
+
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/**
+
+  quality-gate:
+    name: Quality Gate
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Quality Gate Summary
+        run: |
+          echo "## Quality Gate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Compile | PASS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Tests | PASS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Lint | PASS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Build | PASS |" >> $GITHUB_STEP_SUMMARY
+
+  beta:
+    name: Beta Validation
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    environment: beta
+    steps:
+      - name: Download Backend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: backend-build
+
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend-build
+
+      - name: Validate Beta Artifacts
+        run: |
+          echo "Validating artifacts for Beta environment..."
+          
+          if ! ls backend-build/*.jar 1> /dev/null 2>&1; then
+            echo "::error::Backend JAR is missing!"
+            exit 1
+          fi
+          
+          JAR_FILE=$(ls backend-build/*.jar | head -n 1)
+          if [ ! -s "$JAR_FILE" ]; then
+            echo "::error::Backend JAR is empty!"
+            exit 1
+          fi
+          
+          if [ ! -f "frontend-build/index.html" ]; then
+            echo "::error::Frontend index.html is missing!"
+            exit 1
+          fi
+          
+          if [ ! -s "frontend-build/index.html" ]; then
+            echo "::error::Frontend index.html is empty!"
+            exit 1
+          fi
+          
+          echo "BETA VALIDATION PASSED"
+          
+          echo "## Beta Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Candidate:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifacts:** backend-build, frontend-build" >> $GITHUB_STEP_SUMMARY
+          echo "**Result:** PASS" >> $GITHUB_STEP_SUMMARY
+
+  gamma:
+    name: Gamma Validation
+    needs: beta
+    runs-on: ubuntu-latest
+    environment: gamma
+    steps:
+      - name: Download Backend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: backend-build
+
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend-build
+
+      - name: Validate Gamma Artifacts
+        run: |
+          echo "Validating artifacts for Gamma environment..."
+          
+          if ! ls backend-build/*.jar 1> /dev/null 2>&1; then
+            echo "::error::Backend JAR is missing!"
+            exit 1
+          fi
+          
+          JAR_FILE=$(ls backend-build/*.jar | head -n 1)
+          if [ ! -s "$JAR_FILE" ]; then
+            echo "::error::Backend JAR is empty!"
+            exit 1
+          fi
+          
+          if [ ! -f "frontend-build/index.html" ]; then
+            echo "::error::Frontend index.html is missing!"
+            exit 1
+          fi
+          
+          if [ ! -s "frontend-build/index.html" ]; then
+            echo "::error::Frontend index.html is empty!"
+            exit 1
+          fi
+          
+          echo "GAMMA VALIDATION PASSED"
+          
+          echo "## Gamma Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Beta:** PASS" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifacts:** VALID" >> $GITHUB_STEP_SUMMARY
+          echo "**Result:** PASS" >> $GITHUB_STEP_SUMMARY
+
+  production:
+    name: Production Release Gate
+    needs: gamma
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download Backend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build
+          path: backend-build
+
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend-build
+
+      - name: Production Verification
+        run: |
+          echo "Validating artifacts for Production environment..."
+          
+          if ! ls backend-build/*.jar 1> /dev/null 2>&1; then
+            echo "::error::Backend JAR is missing!"
+            exit 1
+          fi
+          
+          JAR_FILE=$(ls backend-build/*.jar | head -n 1)
+          if [ ! -s "$JAR_FILE" ]; then
+            echo "::error::Backend JAR is empty!"
+            exit 1
+          fi
+          
+          if [ ! -f "frontend-build/index.html" ]; then
+            echo "::error::Frontend index.html is missing!"
+            exit 1
+          fi
+          
+          if [ ! -s "frontend-build/index.html" ]; then
+            echo "::error::Frontend index.html is empty!"
+            exit 1
+          fi
+          
+          echo "PRODUCTION RELEASE GATE PASSED"
+          echo "No real infrastructure deployment is performed by this workflow."
+          echo "The project currently uses simulation-first execution."
+          
+          echo "## Production Release Gate" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Beta:** PASS" >> $GITHUB_STEP_SUMMARY
+          echo "**Gamma:** PASS" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment:** NOT PERFORMED" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Gate:** PASS" >> $GITHUB_STEP_SUMMARY
+          
+          # Future real deployment stage:
+          # intentionally disabled until a real deployment target
+          # and protected credentials are configured.
