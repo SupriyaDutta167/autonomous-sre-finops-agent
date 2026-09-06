@@ -1,12 +1,18 @@
 import { formatConfidence } from '../utils/formatters';
-import { SEVERITY_COLORS } from '../utils/constants';
 
-const AgentDecisionCard = ({ action }) => {
+const SEVERITY_COLORS = {
+    CRITICAL: 'text-danger',
+    HIGH: 'text-warning',
+    MEDIUM: 'text-accent',
+    LOW: 'text-success'
+};
+
+export default function AgentDecisionCard({ action }) {
     if (!action) {
         return (
-            <div className="panel flex flex-col justify-center items-center h-full text-center">
-                <div className="text-secondary mb-2">No active incident</div>
-                <div className="text-sm text-muted">Simulation controls are ready.</div>
+            <div className="p-6 rounded-xl bg-surface border border-border flex flex-col justify-center items-center h-full text-center">
+                <div className="text-secondary mb-2">No Active AI Decision</div>
+                <div className="text-sm text-muted">Awaiting agent analysis or simulation trigger.</div>
             </div>
         );
     }
@@ -14,44 +20,45 @@ const AgentDecisionCard = ({ action }) => {
     const severityColor = SEVERITY_COLORS[action.severity] || 'text-secondary';
 
     return (
-        <div className="panel">
-            <h2 className="panel-title">AI Decision</h2>
-            
-            <div className="flex justify-between items-center mb-4">
-                <div className="text-2xl mono text-blue-400">{action.action}</div>
-                <div className="mono bg-slate-800 px-2 py-1 rounded border border-slate-700">
+        <div className="p-6 rounded-xl bg-surface border border-border h-full flex flex-col gap-5">
+            <div className="flex justify-between items-start gap-4">
+                <div className="flex flex-col gap-1">
+                    <div className="text-xs font-mono text-secondary uppercase tracking-wider">Action Proposal</div>
+                    <div className="text-2xl font-mono text-accent">{action.action}</div>
+                </div>
+                <div className="text-sm font-mono bg-subsurface px-3 py-1.5 rounded-lg border border-border text-primary whitespace-nowrap">
                     {action.target}
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <div className="metric-label">Confidence</div>
-                    <div className="text-xl">{formatConfidence(action.confidence)}</div>
+            <div className="grid grid-cols-2 gap-4 p-4 bg-subsurface rounded-lg border border-border">
+                <div className="flex flex-col gap-1">
+                    <div className="text-xs font-mono text-secondary uppercase tracking-wider">Confidence</div>
+                    <div className="text-lg font-medium">{formatConfidence(action.confidence)}</div>
                 </div>
-                <div>
-                    <div className="metric-label">Severity</div>
-                    <div className={`text-xl ${severityColor}`}>{action.severity}</div>
+                <div className="flex flex-col gap-1">
+                    <div className="text-xs font-mono text-secondary uppercase tracking-wider">Severity</div>
+                    <div className={`text-lg font-medium ${severityColor}`}>{action.severity}</div>
                 </div>
             </div>
 
-            <div className="mb-4">
-                <div className="metric-label">Root Cause</div>
-                <div className="mt-1">{action.rootCause}</div>
+            <div className="flex flex-col gap-2">
+                <div className="text-xs font-mono text-secondary uppercase tracking-wider">Root Cause</div>
+                <div className="text-sm leading-relaxed">{action.rootCause}</div>
             </div>
             
-            <div className="mb-4">
-                <div className="metric-label">Reasoning</div>
-                <div className="mt-1">{action.reason}</div>
+            <div className="flex flex-col gap-2">
+                <div className="text-xs font-mono text-secondary uppercase tracking-wider">Reasoning</div>
+                <div className="text-sm leading-relaxed text-secondary">{action.reason}</div>
             </div>
 
             {action.requiresApproval && (
-                <div className="mt-4 p-2 bg-yellow-500/10 border border-yellow-500 rounded text-yellow-500 text-sm flex items-center justify-center">
-                    Requires Human Approval
+                <div className="mt-auto pt-4 border-t border-border">
+                    <div className="px-3 py-2 bg-warning/10 border border-warning/20 rounded-lg text-warning text-xs font-medium uppercase tracking-wide flex items-center justify-center">
+                        Requires Human Approval
+                    </div>
                 </div>
             )}
         </div>
     );
-};
-
-export default AgentDecisionCard;
+}

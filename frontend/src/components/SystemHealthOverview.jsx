@@ -1,65 +1,42 @@
-import { useEffect, useState } from 'react';
-import { getHealth } from '../services/api';
+import { useData } from '../contexts/DataContext';
 
-const SystemHealthOverview = ({ onHealthChange }) => {
-    const [health, setHealth] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        const fetchHealth = async () => {
-            try {
-                setLoading(true);
-                const data = await getHealth();
-                setHealth(data);
-                setError(null);
-                if (onHealthChange) onHealthChange(data);
-            } catch (err) {
-                setError(err.message);
-                if (onHealthChange) onHealthChange(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchHealth();
-        const interval = setInterval(fetchHealth, 30000); // Check every 30s
-        return () => clearInterval(interval);
-    }, [onHealthChange]);
+export default function SystemHealthOverview() {
+    const { backendHealth } = useData();
+    
+    const isOnline = backendHealth?.status === 'healthy';
 
     return (
-        <div className="panel flex flex-col justify-center h-full">
-            <div className="metric-label mb-2">System Health</div>
-            <div className="flex flex-col gap-2 mt-1">
+        <div className="p-5 rounded-xl bg-surface border border-border flex flex-col h-full justify-between gap-4">
+            <div className="text-xs font-mono text-secondary uppercase tracking-wider">System Status</div>
+            
+            <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-center">
-                    <span className="text-xs text-secondary">Backend</span>
-                    {health?.status === 'healthy' ? (
-                        <span className="status-badge status-approved">ONLINE</span>
+                    <span className="text-sm text-secondary">Control Plane</span>
+                    {isOnline ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-success/10 text-success border border-success/20">ONLINE</span>
                     ) : (
-                        <span className="status-badge status-failed">OFFLINE</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-danger/10 text-danger border border-danger/20">OFFLINE</span>
                     )}
                 </div>
+                
                 <div className="flex justify-between items-center">
-                    <span className="text-xs text-secondary">API</span>
-                    {loading && !health ? (
-                        <span className="status-badge status-detected">CHECKING</span>
-                    ) : error ? (
-                        <span className="status-badge status-failed">ERROR</span>
+                    <span className="text-sm text-secondary">Policy Engine</span>
+                    {backendHealth?.simulationEngine === 'ready' || isOnline ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-success/10 text-success border border-success/20">READY</span>
                     ) : (
-                        <span className="status-badge status-approved">CONNECTED</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-warning/10 text-warning border border-warning/20">PENDING</span>
                     )}
                 </div>
+                
                 <div className="flex justify-between items-center">
-                    <span className="text-xs text-secondary">Engine</span>
-                    {health?.simulationEngine === 'ready' || health?.status === 'healthy' ? (
-                        <span className="status-badge status-approved">READY</span>
+                    <span className="text-sm text-secondary">GCP Adapter</span>
+                    {isOnline ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-accent/10 text-accent border border-accent/20">CONNECTED</span>
                     ) : (
-                        <span className="status-badge status-failed">N/A</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider bg-danger/10 text-danger border border-danger/20">DISCONNECTED</span>
                     )}
                 </div>
             </div>
         </div>
     );
-};
-
-export default SystemHealthOverview;
+}
