@@ -1,38 +1,54 @@
 package com.sreagent.finops.execution;
 
+import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.cloud.compute.v1.Instance;
 import com.google.cloud.compute.v1.InstancesClient;
-import org.springframework.context.annotation.Profile;
+import com.google.cloud.compute.v1.InstancesSettings;
+import com.sreagent.finops.service.GcpAuthenticationService;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("gcp")
 public class DefaultGcpClient implements GcpClient {
+
+    private final GcpAuthenticationService authService;
+
+    public DefaultGcpClient(GcpAuthenticationService authService) {
+        this.authService = authService;
+    }
+
+    private InstancesSettings getSettings() throws Exception {
+        if (authService.getCredentials() != null) {
+            return InstancesSettings.newBuilder()
+                    .setCredentialsProvider(FixedCredentialsProvider.create(authService.getCredentials()))
+                    .build();
+        }
+        return InstancesSettings.newBuilder().build(); // Fallback to ADC if no session (useful for local dev)
+    }
 
     @Override
     public void startInstance(String projectId, String zone, String instanceName) throws Exception {
-        try (InstancesClient client = InstancesClient.create()) {
+        try (InstancesClient client = InstancesClient.create(getSettings())) {
             client.startAsync(projectId, zone, instanceName).get();
         }
     }
 
     @Override
     public void stopInstance(String projectId, String zone, String instanceName) throws Exception {
-        try (InstancesClient client = InstancesClient.create()) {
+        try (InstancesClient client = InstancesClient.create(getSettings())) {
             client.stopAsync(projectId, zone, instanceName).get();
         }
     }
 
     @Override
     public void restartInstance(String projectId, String zone, String instanceName) throws Exception {
-        try (InstancesClient client = InstancesClient.create()) {
+        try (InstancesClient client = InstancesClient.create(getSettings())) {
             client.resetAsync(projectId, zone, instanceName).get();
         }
     }
 
     @Override
     public VmState getInstanceState(String projectId, String zone, String instanceName) throws Exception {
-        try (InstancesClient client = InstancesClient.create()) {
+        try (InstancesClient client = InstancesClient.create(getSettings())) {
             Instance instance = client.get(projectId, zone, instanceName);
             if (instance == null) {
                 return null;

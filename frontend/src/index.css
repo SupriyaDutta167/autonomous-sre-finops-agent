@@ -1,29 +1,67 @@
 @import "tailwindcss";
 
 @theme {
-  --color-page: #0f1115;
-  --color-surface: #181b21;
-  --color-subsurface: #22262d;
-  --color-border: #2e343d;
-  --color-primary: #f1f5f9;
-  --color-secondary: #94a3b8;
-  --color-accent: #38bdf8;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-subsurface: var(--bg-subsurface);
+  --color-border: var(--border-color);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
 }
 
 @layer base {
+  :root, [data-theme="dark"] {
+    --bg-page: #0f1115;
+    --bg-surface: #181b21;
+    --bg-subsurface: #22262d;
+    --border-color: #2e343d;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --accent: #38bdf8;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+  }
+  
+  [data-theme="light"] {
+    --bg-page: #f1f5f9;
+    --bg-surface: rgba(255, 255, 255, 0.7);
+    --bg-subsurface: rgba(255, 255, 255, 0.5);
+    --border-color: rgba(255, 255, 255, 0.8);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent: #0284c7;
+    --success: #16a34a;
+    --warning: #d97706;
+    --danger: #dc2626;
+  }
+
+  [data-theme="light"] .bg-surface, [data-theme="light"] .bg-subsurface {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+  }
+
   body {
     background-color: var(--color-page);
     color: var(--color-primary);
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  
+  /* Applying smooth transitions to elements that change color with theme */
+  *, *::before, *::after {
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, backdrop-filter 0.15s ease;
   }
 }
 
 @layer components {
   .btn-base {
-    @apply inline-flex items-center justify-center font-medium rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed;
   }
 }
 
@@ -33,12 +71,12 @@
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-surface);
+  background: var(--bg-surface);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: var(--border-color);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-secondary);
+  background: var(--text-secondary);
 }

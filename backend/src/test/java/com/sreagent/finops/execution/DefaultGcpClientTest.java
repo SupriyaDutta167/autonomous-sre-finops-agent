@@ -1,14 +1,24 @@
 package com.sreagent.finops.execution;
 
 import com.google.cloud.compute.v1.Instance;
+import com.sreagent.finops.service.GcpAuthenticationService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 
 class DefaultGcpClientTest {
 
+    private GcpAuthenticationService mockAuthService;
+
+    @BeforeEach
+    void setUp() {
+        mockAuthService = mock(GcpAuthenticationService.class);
+    }
+
     @Test
     void testMapInstanceToVmState_1vCPU() {
-        DefaultGcpClient client = new DefaultGcpClient();
+        DefaultGcpClient client = new DefaultGcpClient(mockAuthService);
         Instance instance = Instance.newBuilder()
                 .setName("test-micro")
                 .setStatus("RUNNING")
@@ -20,7 +30,7 @@ class DefaultGcpClientTest {
 
     @Test
     void testMapInstanceToVmState_multivCPU() {
-        DefaultGcpClient client = new DefaultGcpClient();
+        DefaultGcpClient client = new DefaultGcpClient(mockAuthService);
         Instance instance = Instance.newBuilder()
                 .setName("test-std-4")
                 .setStatus("RUNNING")
@@ -32,7 +42,7 @@ class DefaultGcpClientTest {
 
     @Test
     void testMapInstanceToVmState_unresolvedMachineType() {
-        DefaultGcpClient client = new DefaultGcpClient();
+        DefaultGcpClient client = new DefaultGcpClient(mockAuthService);
         Instance instance = Instance.newBuilder()
                 .setName("test-unknown")
                 .setStatus("RUNNING")
@@ -44,7 +54,7 @@ class DefaultGcpClientTest {
 
     @Test
     void testMapInstanceToVmState_noMachineType() {
-        DefaultGcpClient client = new DefaultGcpClient();
+        DefaultGcpClient client = new DefaultGcpClient(mockAuthService);
         Instance instance = Instance.newBuilder()
                 .setName("test-none")
                 .setStatus("RUNNING")

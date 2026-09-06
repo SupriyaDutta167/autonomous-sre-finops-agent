@@ -815,3 +815,22 @@ License: not yet specified.
 
 Autonomous SRE + FinOps Agent
 *(Hackathon Submission)*
+
+
+## Plug-and-Play Google Cloud Setup
+
+Simulation is the default runtime mode for this application, offering a safe, credential-free environment to test FinOps and SRE capabilities. 
+
+Connecting to a real Google Cloud environment is optional. The application uses a secure OAuth flow where all credentials remain strictly server-side. No tokens, private keys, or service-account JSONs are ever exposed to the browser or stored in local storage.
+
+To connect your Google Cloud account:
+
+1. Open **Settings**.
+2. Select **Google Cloud** under Runtime Mode.
+3. Click **Connect Google Cloud**.
+4. Authenticate via the Google OAuth consent screen.
+5. Once returned to the application, configure your **Project** and **Zone** (if supported by your credentials).
+6. Click **Test connection** to verify read-only access.
+7. Keep **Live Mutations** OFF unless explicitly required. 
+
+**Safety Note:** GCP mutations (e.g. stopping or resizing VMs) are disabled by default even after a successful connection. Do not enable mutations unless you are explicitly testing authorized actions against real infrastructure. Real GCP mutations were not executed during the development of this plugin.

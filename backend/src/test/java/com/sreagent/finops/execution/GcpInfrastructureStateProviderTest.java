@@ -1,6 +1,8 @@
 package com.sreagent.finops.execution;
 
 import com.google.api.gax.rpc.NotFoundException;
+import com.google.api.gax.rpc.StatusCode;
+import com.sreagent.finops.service.GcpAuthenticationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -10,59 +12,70 @@ import static org.mockito.Mockito.*;
 class GcpInfrastructureStateProviderTest {
 
     private GcpClient mockGcpClient;
+    private GcpAuthenticationService mockAuthService;
 
     @BeforeEach
     void setUp() {
         mockGcpClient = mock(GcpClient.class);
+        mockAuthService = mock(GcpAuthenticationService.class);
+        when(mockAuthService.isConnected()).thenReturn(true);
+        when(mockAuthService.getProjectId()).thenReturn("test-project");
+        when(mockAuthService.getZone()).thenReturn("test-zone");
     }
 
     @Test
     void missingConfigurationThrowsException() {
-        assertThrows(GcpConfigurationException.class, () -> new GcpInfrastructureStateProvider(null, "zone", mockGcpClient));
-        assertThrows(GcpConfigurationException.class, () -> new GcpInfrastructureStateProvider("project", null, mockGcpClient));
+        when(mockAuthService.isConnected()).thenReturn(false);
+        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider(mockAuthService, mockGcpClient);
+        VmState state = provider.getVmState("target-vm");
+        assertEquals("UNKNOWN", state.state());
     }
 
     @Test
-    void returnsStateWhenInstanceExists() throws Exception {
-        VmState expectedState = new VmState("target-vm", "RUNNING", 1);
-        when(mockGcpClient.getInstanceState("test-project", "test-zone", "target-vm")).thenReturn(expectedState);
-
-        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider("test-project", "test-zone", mockGcpClient);
-        VmState actualState = provider.getVmState("target-vm");
-
-        assertEquals(expectedState, actualState);
+    void returnsStateWhenFound() throws Exception {
+        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider(mockAuthService, mockGcpClient);
+        
+        VmState mockState = new VmState("target-vm", "RUNNING", 4);
+        when(mockGcpClient.getInstanceState("test-project", "test-zone", "target-vm")).thenReturn(mockState);
+        
+        VmState result = provider.getVmState("target-vm");
+        
+        assertEquals("target-vm", result.instanceName());
+        assertEquals("RUNNING", result.state());
+        assertEquals(4, result.capacity());
     }
 
     @Test
-    void returnsUnknownWhenInstanceNull() throws Exception {
+    void returnsUnknownWhenNull() throws Exception {
+        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider(mockAuthService, mockGcpClient);
+        
         when(mockGcpClient.getInstanceState("test-project", "test-zone", "target-vm")).thenReturn(null);
-
-        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider("test-project", "test-zone", mockGcpClient);
-        VmState actualState = provider.getVmState("target-vm");
-
-        assertEquals("target-vm", actualState.instanceName());
-        assertEquals("UNKNOWN", actualState.state());
+        
+        VmState result = provider.getVmState("target-vm");
+        
+        assertEquals("target-vm", result.instanceName());
+        assertEquals("UNKNOWN", result.state());
     }
 
     @Test
-    void returnsUnknownWhenInstanceNotFound() throws Exception {
-        NotFoundException notFoundException = mock(NotFoundException.class);
-        when(mockGcpClient.getInstanceState("test-project", "test-zone", "target-vm"))
-            .thenThrow(notFoundException); // Simulating NotFound
-
-        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider("test-project", "test-zone", mockGcpClient);
-        VmState actualState = provider.getVmState("target-vm");
-
-        assertEquals("target-vm", actualState.instanceName());
-        assertEquals("UNKNOWN", actualState.state());
+    void returnsUnknownOnNotFoundException() throws Exception {
+        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider(mockAuthService, mockGcpClient);
+        
+        NotFoundException nfe = mock(NotFoundException.class);
+        when(mockGcpClient.getInstanceState("test-project", "test-zone", "target-vm")).thenThrow(nfe);
+        
+        VmState result = provider.getVmState("target-vm");
+        
+        assertEquals("target-vm", result.instanceName());
+        assertEquals("UNKNOWN", result.state());
     }
 
     @Test
     void throwsExecutionExceptionOnOtherErrors() throws Exception {
+        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider(mockAuthService, mockGcpClient);
+        
         when(mockGcpClient.getInstanceState("test-project", "test-zone", "target-vm"))
-            .thenThrow(new RuntimeException("API error"));
-
-        GcpInfrastructureStateProvider provider = new GcpInfrastructureStateProvider("test-project", "test-zone", mockGcpClient);
+                .thenThrow(new RuntimeException("API error"));
         
         GcpExecutionException exception = assertThrows(GcpExecutionException.class, () -> {
             provider.getVmState("target-vm");
@@ -71,3 +84,4 @@ class GcpInfrastructureStateProviderTest {
         assertTrue(exception.getMessage().contains("Failed to read instance state from GCP: API error"));
     }
 }
+

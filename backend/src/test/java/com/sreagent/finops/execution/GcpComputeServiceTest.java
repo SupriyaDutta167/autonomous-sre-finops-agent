@@ -3,6 +3,7 @@ package com.sreagent.finops.execution;
 import com.sreagent.finops.model.ActionType;
 import com.sreagent.finops.model.Severity;
 import com.sreagent.finops.model.SreAction;
+import com.sreagent.finops.service.GcpAuthenticationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -12,10 +13,15 @@ import static org.mockito.Mockito.*;
 class GcpComputeServiceTest {
 
     private GcpClient mockGcpClient;
+    private GcpAuthenticationService mockAuthService;
 
     @BeforeEach
     void setUp() {
         mockGcpClient = mock(GcpClient.class);
+        mockAuthService = mock(GcpAuthenticationService.class);
+        when(mockAuthService.isConnected()).thenReturn(true);
+        when(mockAuthService.getProjectId()).thenReturn("test-project");
+        when(mockAuthService.getZone()).thenReturn("test-zone");
     }
 
     private SreAction createAction(ActionType type, String target) {
@@ -24,21 +30,24 @@ class GcpComputeServiceTest {
 
     @Test
     void implementsInfrastructureExecutor() {
-        GcpComputeService service = new GcpComputeService("test-project", "test-zone", false, mockGcpClient);
+        GcpComputeService service = new GcpComputeService(mockAuthService, mockGcpClient);
         assertTrue(service instanceof InfrastructureExecutor);
     }
 
     @Test
     void missingConfigurationThrowsException() {
-        assertThrows(GcpConfigurationException.class, () -> new GcpComputeService(null, "test-zone", false, mockGcpClient));
-        assertThrows(GcpConfigurationException.class, () -> new GcpComputeService("", "test-zone", false, mockGcpClient));
-        assertThrows(GcpConfigurationException.class, () -> new GcpComputeService("test-project", null, false, mockGcpClient));
-        assertThrows(GcpConfigurationException.class, () -> new GcpComputeService("test-project", "", false, mockGcpClient));
+        // Not configured returns false
+        when(mockAuthService.isConnected()).thenReturn(false);
+        GcpComputeService service = new GcpComputeService(mockAuthService, mockGcpClient);
+        ExecutionResult result = service.execute(createAction(ActionType.START_VM, "target-vm"));
+        assertFalse(result.success());
+        assertEquals("GCP not connected or configured.", result.message());
     }
 
     @Test
     void mutationGuardDisabledByDefaultAndPreventsApiCall() throws Exception {
-        GcpComputeService service = new GcpComputeService("test-project", "test-zone", false, mockGcpClient);
+        when(mockAuthService.isMutationsEnabled()).thenReturn(false);
+        GcpComputeService service = new GcpComputeService(mockAuthService, mockGcpClient);
         ExecutionResult result = service.execute(createAction(ActionType.START_VM, "target-vm"));
 
         assertFalse(result.success());
@@ -49,7 +58,8 @@ class GcpComputeServiceTest {
 
     @Test
     void correctActionMappingStartVm() throws Exception {
-        GcpComputeService service = new GcpComputeService("test-project", "test-zone", true, mockGcpClient);
+        when(mockAuthService.isMutationsEnabled()).thenReturn(true);
+        GcpComputeService service = new GcpComputeService(mockAuthService, mockGcpClient);
         ExecutionResult result = service.execute(createAction(ActionType.START_VM, "target-vm"));
 
         assertTrue(result.success());
@@ -59,7 +69,8 @@ class GcpComputeServiceTest {
 
     @Test
     void correctActionMappingStopVm() throws Exception {
-        GcpComputeService service = new GcpComputeService("test-project", "test-zone", true, mockGcpClient);
+        when(mockAuthService.isMutationsEnabled()).thenReturn(true);
+        GcpComputeService service = new GcpComputeService(mockAuthService, mockGcpClient);
         ExecutionResult result = service.execute(createAction(ActionType.STOP_VM, "target-vm"));
 
         assertTrue(result.success());
@@ -69,7 +80,8 @@ class GcpComputeServiceTest {
 
     @Test
     void correctActionMappingRestartVm() throws Exception {
-        GcpComputeService service = new GcpComputeService("test-project", "test-zone", true, mockGcpClient);
+        when(mockAuthService.isMutationsEnabled()).thenReturn(true);
+        GcpComputeService service = new GcpComputeService(mockAuthService, mockGcpClient);
         ExecutionResult result = service.execute(createAction(ActionType.RESTART_VM, "target-vm"));
 
         assertTrue(result.success());
@@ -79,7 +91,8 @@ class GcpComputeServiceTest {
 
     @Test
     void correctErrorMapping() throws Exception {
-        GcpComputeService service = new GcpComputeService("test-project", "test-zone", true, mockGcpClient);
+        when(mockAuthService.isMutationsEnabled()).thenReturn(true);
+        GcpComputeService service = new GcpComputeService(mockAuthService, mockGcpClient);
         
         doThrow(new RuntimeException("API error")).when(mockGcpClient).startInstance(anyString(), anyString(), anyString());
         

@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
-@Profile("!gcp")
 public class SimulationExecutor implements InfrastructureExecutor, InfrastructureStateProvider {
 
     private final Map<String, SimulatedVm> vms = new ConcurrentHashMap<>();

@@ -9,38 +9,40 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
+import com.sreagent.finops.service.GcpAuthenticationService;
+
 @Service
-@Profile("gcp")
 public class GcpComputeService implements InfrastructureExecutor {
     private static final Logger logger = LoggerFactory.getLogger(GcpComputeService.class);
 
-    private final String projectId;
-    private final String zone;
-    private final boolean mutationsEnabled;
+    private final GcpAuthenticationService authService;
     private final GcpClient gcpClient;
 
     public GcpComputeService(
-            @Value("${finops.gcp.project-id:${GCP_PROJECT_ID:}}") String projectId,
-            @Value("${finops.gcp.compute-zone:${GCP_COMPUTE_ZONE:}}") String zone,
-            @Value("${finops.gcp.mutations.enabled:${GCP_MUTATIONS_ENABLED:false}}") boolean mutationsEnabled,
+            GcpAuthenticationService authService,
             GcpClient gcpClient) {
-        
-        if (projectId == null || projectId.isBlank()) {
-            throw new GcpConfigurationException("GCP project ID is required but missing");
-        }
-        if (zone == null || zone.isBlank()) {
-            throw new GcpConfigurationException("GCP compute zone is required but missing");
-        }
-        
-        this.projectId = projectId;
-        this.zone = zone;
-        this.mutationsEnabled = mutationsEnabled;
+        this.authService = authService;
         this.gcpClient = gcpClient;
-        logger.info("GCP adapter initialized for project: {}, zone: {}, mutationsEnabled: {}", projectId, zone, mutationsEnabled);
+        logger.info("GCP adapter initialized");
     }
 
     @Override
     public ExecutionResult execute(SreAction action) {
+        String projectId = authService.getProjectId();
+        String zone = authService.getZone();
+        boolean mutationsEnabled = authService.isMutationsEnabled();
+        
+        if (!authService.isConnected() || projectId == null || zone == null) {
+            return new ExecutionResult(
+                    false,
+                    action.action(),
+                    action.target(),
+                    "GCP not connected or configured.",
+                    Instant.now(),
+                    "UNKNOWN"
+            );
+        }
+
         if (!mutationsEnabled) {
             logger.info("GCP mutation disabled. No infrastructure change performed for action: {}", action.action());
             return new ExecutionResult(

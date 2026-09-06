@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DataProvider } from './contexts/DataContext';
+import { PreferencesProvider } from './contexts/PreferencesContext';
 import AppLayout from './layouts/AppLayout';
 
 import Welcome from './pages/Welcome';
@@ -16,27 +17,29 @@ import Settings from './pages/Settings';
 
 export default function App() {
   return (
-    <DataProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Welcome />} />
-          
-          <Route element={<AppLayout />}>
-            <Route path="/overview" element={<Overview />} />
-            <Route path="/incidents" element={<Incidents />} />
-            <Route path="/incidents/:id" element={<IncidentDetails />} />
-            <Route path="/infrastructure" element={<Infrastructure />} />
-            <Route path="/infrastructure/:instanceName" element={<InfrastructureDetails />} />
-            <Route path="/agent" element={<Agent />} />
-            <Route path="/safety" element={<Safety />} />
-            <Route path="/finops" element={<FinOps />} />
-            <Route path="/activity" element={<Activity />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </DataProvider>
+    <PreferencesProvider>
+      <DataProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Welcome />} />
+            
+            <Route element={<AppLayout />}>
+              <Route path="/overview" element={<Overview />} />
+              <Route path="/incidents" element={<Incidents />} />
+              <Route path="/incidents/:id" element={<IncidentDetails />} />
+              <Route path="/infrastructure" element={<Infrastructure />} />
+              <Route path="/infrastructure/:instanceName" element={<InfrastructureDetails />} />
+              <Route path="/agent" element={<Agent />} />
+              <Route path="/safety" element={<Safety />} />
+              <Route path="/finops" element={<FinOps />} />
+              <Route path="/activity" element={<Activity />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+            
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </DataProvider>
+    </PreferencesProvider>
   );
 }
